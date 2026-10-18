@@ -17,7 +17,7 @@ const run = async () => {
   console.log('\n1) Resend account owner (should succeed via Resend):');
   const r1 = await sendEmail({
     to: resendOwner,
-    subject: 'Charlie Bells — Resend path test',
+    subject: 'IBelieveThis — Resend path test',
     html: '<p>This email was sent through the Resend path.</p>',
   });
   console.log('   ', r1);
@@ -25,7 +25,7 @@ const run = async () => {
   console.log('\n2) Store owner inbox (Resend may fail → Gmail fallback):');
   const r2 = await sendEmail({
     to: owner,
-    subject: 'Charlie Bells — Owner notification test',
+    subject: 'IBelieveThis — Owner notification test',
     html: '<p>New-order owner notification path is working.</p><p>Subtotal / Tax / Shipping / Total will appear on real orders.</p>',
   });
   console.log('   ', r2);
@@ -33,7 +33,7 @@ const run = async () => {
   console.log('\n3) Customer-style recipient (same as owner for this test):');
   const r3 = await sendEmail({
     to: owner,
-    subject: 'Charlie Bells — Customer confirmation test',
+    subject: 'IBelieveThis — Customer confirmation test',
     html: '<p>Thank you for your order. Customer confirmation path is working.</p>',
   });
   console.log('   ', r3);

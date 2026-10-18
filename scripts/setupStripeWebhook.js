@@ -73,7 +73,7 @@ if (match) {
 const created = await stripe.webhookEndpoints.create({
   url: requestedUrl,
   enabled_events: ENABLED_EVENTS,
-  description: 'Charlie Bells order payments',
+  description: 'IBelieveThis order payments',
 });
 
 if (created.secret) {

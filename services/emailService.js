@@ -4,7 +4,7 @@ let resendClient = null;
 
 function getResendFrom() {
   // Prefer verified store domain. onboarding@resend.dev is test-only (1 recipient).
-  return process.env.RESEND_FROM || `"Charlie Bells" <orders@charlie-bells.com>`;
+  return process.env.RESEND_FROM || `"IBelieveThis" <orders@ibelievethis.us>`;
 }
 
 function isResendTestingMode() {
@@ -72,7 +72,7 @@ async function sendViaGmail({ to, subject, html }) {
 
   try {
     const smtpFrom = auth.gmailUser.includes('@')
-      ? `"Charlie Bells" <${auth.gmailUser}>`
+      ? `"IBelieveThis" <${auth.gmailUser}>`
       : getResendFrom();
     await transporter.sendMail({ from: smtpFrom, to, subject, html });
     console.log('✅ Email sent via Gmail to:', to);

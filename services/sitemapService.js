@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import { Product, Category } from '../models/index.js';
 import { productPathSlug, slugify } from '../utils/slugify.js';
 
-const SITE = process.env.PUBLIC_SITE_URL || 'https://charlie-bells.com';
+const SITE = process.env.PUBLIC_SITE_URL || 'https://ibelievethis.us';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_SITEMAP_PATH = path.resolve(__dirname, '../../Frontend/public/sitemap.xml');
 

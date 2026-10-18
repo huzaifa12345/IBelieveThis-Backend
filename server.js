@@ -37,7 +37,14 @@ app.use((req, res, next) => {
 
 // Middleware
 app.use(cors({ 
-  origin: ['https://charlie-bells.vercel.app','https://www.charlie-bells.com', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    'https://ibelievethis.us',
+    'https://www.ibelievethis.us',
+    'https://charlie-bells.vercel.app',
+    'https://www.charlie-bells.com',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature']
@@ -89,7 +96,7 @@ app.get('/api/health', (req, res) => {
     : null;
   res.json({
     status: 'OK',
-    message: 'Charlie Bells E-commerce API is running',
+    message: 'IBelieveThis E-commerce API is running',
     timestamp: new Date().toISOString(),
     email: {
       resend_key: Boolean(resendKey),

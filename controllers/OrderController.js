@@ -8,7 +8,7 @@ import { recordPaymentAudit, describePaymentIntent } from '../services/paymentAu
 
 // Read at call-time so Render/dotenv env is always current (not frozen at import).
 function getEmailFrom() {
-  return process.env.RESEND_FROM || `"Charlie Bells" <orders@charlie-bells.com>`;
+  return process.env.RESEND_FROM || `"IBelieveThis" <orders@ibelievethis.us>`;
 }
 function getOwnerNotifyEmail() {
   const raw = process.env.ORDER_NOTIFICATION_EMAIL || process.env.GMAIL_USER || '';
@@ -207,13 +207,13 @@ const createOrder = async (req, res) => {
               <h3 style="margin-top:18px;color:#111827;">Ship To</h3>
               <p style="margin:0;color:#374151;">${shippingLine || 'Address on file'}</p>
               <p style="margin-top:18px;color:#6b7280;font-size:13px;">
-                This email was sent from Charlie Bells.
+                This email was sent from IBelieveThis.
               </p>
             </div>
           `;
 
-      const customerSubject = `Your Charlie Bells Order ${order_number}`;
-      const ownerSubject = `New Charlie Bells Order ${order_number}`;
+      const customerSubject = `Your IBelieveThis Order ${order_number}`;
+      const ownerSubject = `New IBelieveThis Order ${order_number}`;
       const ownerName = 'Store Owner';
       const ownerEmailHtml = `
             <div style="font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#111827;">
@@ -230,7 +230,7 @@ const createOrder = async (req, res) => {
               ${itemsTableHtml}
               ${totalsHtml}
               <p style="margin-top:18px;color:#6b7280;font-size:13px;">
-                This notification is from Charlie Bells.
+                This notification is from IBelieveThis.
               </p>
             </div>
           `;
