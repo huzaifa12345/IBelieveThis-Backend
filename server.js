@@ -122,16 +122,20 @@ const startServer = async () => {
     // 1. Connection check
     await sequelize.authenticate();
     console.log('Database connection has been established successfully.');
-    await ensureShippingSettings();
-    console.log('Shipping settings ready.');
 
     // Normalize failed_emails timestamps BEFORE sync({ alter }) — otherwise
     // Sequelize tries ADD COLUMN created_at NOT NULL and crashes on existing rows.
+    // Safe when table is missing (fresh Render DB) — sync creates it.
     await ensureFailedEmailTimestamps();
     console.log('Failed email table timestamps ready.');
 
+    // Create / alter tables FIRST — fresh DBs have no website_settings yet
     await sequelize.sync({ alter: true });
     console.log('Database synchronized successfully. Tables are ready!');
+
+    // Seed defaults only after tables exist
+    await ensureShippingSettings();
+    console.log('Shipping settings ready.');
 
     // Warm sitemap file on boot so Frontend/public stays in sync for local/static hosts
     refreshSitemapAsync();
