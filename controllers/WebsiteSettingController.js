@@ -3,6 +3,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { cloudinary } from '../config/cloudinary.js';
+import {
+  BRAND_DEFAULT_SETTINGS,
+  ensureBrandSettings,
+} from '../services/websiteBrandSettingsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +130,14 @@ export const updateWebsiteSetting = async (req, res) => {
 // Get all website settings
 export const getWebsiteSettings = async (req, res) => {
   try {
+    // Fresh production DBs may only have shipping — backfill logo/hero if missing
+    const brandCount = await WebsiteSetting.count({
+      where: { category: ['logo', 'hero'], is_active: true },
+    });
+    if (brandCount === 0) {
+      await ensureBrandSettings();
+    }
+
     const settings = await WebsiteSetting.findAll({
       where: { is_active: true },
       order: [['category', 'ASC'], ['sort_order', 'ASC']]
@@ -182,129 +194,15 @@ export const getSettingByKey = async (req, res) => {
   }
 };
 
-// Initialize default settings
+// Initialize default settings (logo + hero). Safe to call anytime — findOrCreate only.
 export const initializeSettings = async (req, res) => {
   try {
-    const defaultSettings = [
-      // Logo settings
-      {
-        key: 'website_logo',
-        value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMjQwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMjQwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjZjNmNGY2Ii8+Cjx0ZXh0IHg9IjEyMCIgeT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzMzMzMzMyIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkxvZ288L3RleHQ+Cjwvc3ZnPg==',
-        type: 'image',
-        description: 'Website main logo',
-        category: 'logo',
-        sort_order: 1
-      },
-      // Hero slider settings
-      {
-        key: 'hero_slide_1',
-        value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwMCIgaGVpZ2h0PSI2MDAiIHZpZXdCb3g9IjAgMCAxNjAwIDYwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjZGRkIi8+Cjx0ZXh0IHg9IjgwMCIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5IZXJvIFNsaWRlIDE8L3RleHQ+Cjx0ZXh0IHg9IjgwMCIgeT0iMzQwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5Db21lIFNob3AgTm93ITwvdGV4dD4KPHN2Zz4=',
-        type: 'image',
-        description: 'Hero slider image 1',
-        category: 'hero',
-        sort_order: 1
-      },
-      {
-        key: 'hero_slide_2',
-        value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwMCIgaGVpZ2h0PSI2MDAiIHZpZXdCb3g9IjAgMCAxNjAwIDYwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjZGRkIi8+Cjx0ZXh0IHg9IjgwMCIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5IZXJvIFNsaWRlIDI8L3RleHQ+Cjx0ZXh0IHg9IjgwMCIgeT0iMzQwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5EZWFscyAmIE9mZmVJzITwvdGV4dD4KPHN2Zz4=',
-        type: 'image',
-        description: 'Hero slider image 2',
-        category: 'hero',
-        sort_order: 2
-      },
-      {
-        key: 'hero_slide_3',
-        value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwMCIgaGVpZ2h0PSI2MDAiIHZpZXdCb3g9IjAgMCAxNjAwIDYwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjZGRkIi8+Cjx0ZXh0IHg9IjgwMCIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5IZXJvIFNsaWRlIDM8L3RleHQ+Cjx0ZXh0IHg9IjgwMCIgeT0iMzQwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5OZXcgQXJyaXZhbHMhPC90ZXh0Pgo8L3N2Zz4=',
-        type: 'image',
-        description: 'Hero slider image 3',
-        category: 'hero',
-        sort_order: 3
-      },
-      {
-        key: 'hero_slide_4',
-        value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwMCIgaGVpZ2h0PSI2MDAiIHZpZXdCb3g9IjAgMCAxNjAwIDYwMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjE2MDAiIGhlaWdodD0iNjAwIiBmaWxsPSIjZGRkIi8+Cjx0ZXh0IHg9IjgwMCIgeT0iMzAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDAiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5IZXJvIFNsaWRlIDQ8L3RleHQ+Cjx0ZXh0IHg9IjgwMCIgeT0iMzQwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiM5OTk5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2ZWtIj5TcGVjaWFsIE9mZmVycyE8L3RleHQ+Cjwvc3ZnPg==',
-        type: 'image',
-        description: 'Hero slider image 4',
-        category: 'hero',
-        sort_order: 4
-      },
-      // Hero text settings
-      {
-        key: 'hero_title_1',
-        value: 'Welcome to Kids Colours',
-        type: 'text',
-        description: 'Hero slide 1 title',
-        category: 'hero',
-        sort_order: 5
-      },
-      {
-        key: 'hero_description_1',
-        value: 'Discover amazing products with unbeatable prices and quality',
-        type: 'text',
-        description: 'Hero slide 1 description',
-        category: 'hero',
-        sort_order: 6
-      },
-      {
-        key: 'hero_title_2',
-        value: 'Trendy Fashion for Kids',
-        type: 'text',
-        description: 'Hero slide 2 title',
-        category: 'hero',
-        sort_order: 7
-      },
-      {
-        key: 'hero_description_2',
-        value: 'Explore our latest collection of stylish kids\' clothing',
-        type: 'text',
-        description: 'Hero slide 2 description',
-        category: 'hero',
-        sort_order: 8
-      },
-      {
-        key: 'hero_title_3',
-        value: 'Fun Toys & Games',
-        type: 'text',
-        description: 'Hero slide 3 title',
-        category: 'hero',
-        sort_order: 9
-      },
-      {
-        key: 'hero_description_3',
-        value: 'Educational and entertaining toys for your little ones',
-        type: 'text',
-        description: 'Hero slide 3 description',
-        category: 'hero',
-        sort_order: 10
-      },
-      {
-        key: 'hero_title_4',
-        value: 'Comfortable Kids Shoes',
-        type: 'text',
-        description: 'Hero slide 4 title',
-        category: 'hero',
-        sort_order: 11
-      },
-      {
-        key: 'hero_description_4',
-        value: 'Stylish and comfortable footwear for active kids',
-        type: 'text',
-        description: 'Hero slide 4 description',
-        category: 'hero',
-        sort_order: 12
-      }
-    ];
-
-    for (const setting of defaultSettings) {
-      const [existingSetting] = await WebsiteSetting.findOrCreate({
-        where: { key: setting.key },
-        defaults: setting
-      });
-    }
+    await ensureBrandSettings();
 
     res.json({
       success: true,
-      message: 'Default settings initialized successfully'
+      message: 'Default logo & hero settings initialized successfully',
+      keys: BRAND_DEFAULT_SETTINGS.map((s) => s.key),
     });
   } catch (error) {
     console.error('Error initializing settings:', error);

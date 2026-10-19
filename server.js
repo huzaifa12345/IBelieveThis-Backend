@@ -20,6 +20,7 @@ import paymentRoutes from './routes/payments.js';
 import shippingRoutes from './routes/shipping.js';
 import { handleStripeWebhook } from './controllers/PaymentController.js';
 import { ensureShippingSettings } from './services/shippingSettingsService.js';
+import { ensureBrandSettings } from './services/websiteBrandSettingsService.js';
 import { ensureFailedEmailTimestamps } from './scripts/fixFailedEmailTimestamps.js';
 import { getSitemap, rebuildSitemap } from './controllers/SitemapController.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
@@ -42,6 +43,7 @@ app.use(cors({
     'https://www.ibelievethis.us',
     'https://charlie-bells.vercel.app',
     'https://www.charlie-bells.com',
+    'https://i-believe-this-frontend-h8bolfam6.vercel.app',
     'http://localhost:5173',
     'http://localhost:3000',
   ],
@@ -136,6 +138,8 @@ const startServer = async () => {
     // Seed defaults only after tables exist
     await ensureShippingSettings();
     console.log('Shipping settings ready.');
+    await ensureBrandSettings();
+    console.log('Logo & hero slider settings ready.');
 
     // Warm sitemap file on boot so Frontend/public stays in sync for local/static hosts
     refreshSitemapAsync();
