@@ -50,7 +50,7 @@ const router = express.Router();
 router.post('/upload-images', 
   authenticateToken, 
   requireAdmin, 
-  upload.array('images', 4), 
+  upload.array('images', 10), 
   (req, res) => {
     try {
       if (!req.files || req.files.length === 0) {
@@ -105,7 +105,7 @@ router.use((error, req, res, next) => {
       return res.status(400).json({ error: 'File size too large. Maximum size is 5MB.' });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({ error: 'Too many files. Maximum is 4 files.' });
+      return res.status(400).json({ error: 'Too many files. Maximum is 10 files.' });
     }
     if (error.code === 'LIMIT_UNEXPECTED_FILE') {
       return res.status(400).json({ error: 'Unexpected file field.' });

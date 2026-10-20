@@ -74,6 +74,7 @@ const getAllProducts = async (req, res) => {
       category_id,
       category,
       search,
+      include_inactive,
       min_price: minPriceSnake,
       max_price: maxPriceSnake,
       minPrice: minPriceCamel,
@@ -87,10 +88,13 @@ const getAllProducts = async (req, res) => {
     const maxPrice = maxPriceSnake ?? maxPriceCamel;
     const sortBy = sortBySnake ?? sortByCamel ?? 'created_at';
     const [sortField, sortOrder] = getSortConfig(sortBy, order);
+    const includeInactive =
+      include_inactive === 'true' || include_inactive === '1' || include_inactive === true;
 
-    console.log('INFO [PRODUCTS/GET_ALL]: Query params:', { page, limit, category_id, category, search, minPrice, maxPrice, sortBy, order });
+    console.log('INFO [PRODUCTS/GET_ALL]: Query params:', { page, limit, category_id, category, search, minPrice, maxPrice, sortBy, order, includeInactive });
 
-    const where = { is_active: true };
+    // Storefront keeps active-only; admin can request include_inactive=true
+    const where = includeInactive ? {} : { is_active: true };
     
     // Filter by category
     if (category_id) {
@@ -513,13 +517,14 @@ const createProduct = async (req, res) => {
     console.log('INFO [PRODUCTS/CREATE]: Starting product creation');
     
     // Extract and validate required fields
-    const { name, description, price, discount_price, stock_quantity, category_id, image_url, images, brand, category, barcode } = req.body;
+    const { name, description, price, discount_price, stock_quantity, category_id, image_url, images, sizes, brand, category, barcode } = req.body;
     
     console.log('INFO [PRODUCTS/CREATE]: Form data received:', { 
       name, 
       price, 
       stock_quantity,
-      barcode
+      barcode,
+      sizes_count: Array.isArray(sizes) ? sizes.length : 0,
     });
     
     // Validate required fields
@@ -528,6 +533,19 @@ const createProduct = async (req, res) => {
         error: 'Missing required fields: name, price, stock_quantity' 
       });
     }
+
+    const normalizedSizes = Array.isArray(sizes)
+      ? sizes
+          .filter((s) => s && String(s.size || '').trim())
+          .map((s) => ({
+            size: String(s.size).trim(),
+            quantity: Math.max(0, parseInt(s.quantity, 10) || 0),
+          }))
+      : [];
+
+    const sizeStockTotal = normalizedSizes.reduce((sum, s) => sum + s.quantity, 0);
+    const resolvedStock =
+      normalizedSizes.length > 0 ? sizeStockTotal : parseInt(stock_quantity, 10) || 0;
 
     // Check for duplicate barcode if provided
     if (barcode && barcode.trim()) {
@@ -559,7 +577,7 @@ const createProduct = async (req, res) => {
       description: description || '',
       price: parseFloat(price),
       discount_price: discount_price ? parseFloat(discount_price) : null,
-      stock_quantity: parseInt(stock_quantity),
+      stock_quantity: resolvedStock,
       category_id: category_id || null,
       image_url: image_url || '',
       images: images || [],
@@ -567,7 +585,7 @@ const createProduct = async (req, res) => {
       category: category || null,
       sku: nextSku,
       barcode: barcode ? barcode.trim() : null,
-      // No sizes for chemical products - simplified inventory
+      sizes: normalizedSizes,
     };
 
     console.log('INFO [PRODUCTS/CREATE]: Product data:', { 
@@ -579,6 +597,25 @@ const createProduct = async (req, res) => {
 
     console.log('INFO [PRODUCTS/CREATE]: Creating product in database');
     const product = await Product.create(productData);
+
+    // Create size catalog + stock rows for Etsy-style variations
+    if (normalizedSizes.length > 0) {
+      for (const sizeItem of normalizedSizes) {
+        const [sizeRecord] = await Size.findOrCreate({
+          where: { size: sizeItem.size },
+          defaults: { size: sizeItem.size, description: '' },
+        });
+        await Stock.findOrCreate({
+          where: { product_id: product.id, size_id: sizeRecord.id },
+          defaults: {
+            product_id: product.id,
+            size_id: sizeRecord.id,
+            quantity: sizeItem.quantity,
+            reorder_level: 5,
+          },
+        });
+      }
+    }
     
     console.log('INFO [PRODUCTS/CREATE]: Fetching created product with category');
     const createdProduct = await Product.findByPk(product.id, {
@@ -677,21 +714,36 @@ const updateProduct = async (req, res) => {
           // Create new stock entries for selected sizes
           const stockPromises = [];
           for (const sizeItem of sizes) {
-            const sizeId = sizeMap[sizeItem.size];
-            if (sizeId) {
-              stockPromises.push(
-                Stock.create({
-                  product_id: parseInt(id),
-                  size_id: parseInt(sizeId),
-                  quantity: parseInt(stock_quantity) || 0,
-                  reorder_level: 5
-                })
-              );
-              console.log(`INFO [PRODUCTS/UPDATE]: Adding stock for size ${sizeItem.size} (ID: ${sizeId})`);
-            } else {
-              console.warn(`INFO [PRODUCTS/UPDATE]: Size not found in database: ${sizeItem.size}`);
+            const sizeName = String(sizeItem.size || '').trim();
+            if (!sizeName) continue;
+
+            let sizeId = sizeMap[sizeName];
+            if (!sizeId) {
+              const [createdSize] = await Size.findOrCreate({
+                where: { size: sizeName },
+                defaults: { size: sizeName, description: '' },
+              });
+              sizeId = createdSize.id;
+              sizeMap[sizeName] = sizeId;
             }
+
+            stockPromises.push(
+              Stock.create({
+                product_id: parseInt(id),
+                size_id: parseInt(sizeId),
+                quantity: Math.max(0, parseInt(sizeItem.quantity, 10) || 0),
+                reorder_level: 5
+              })
+            );
+            console.log(`INFO [PRODUCTS/UPDATE]: Adding stock for size ${sizeName} (ID: ${sizeId})`);
           }
+
+          // Keep product.stock_quantity in sync with size totals
+          const sizeTotal = sizes.reduce(
+            (sum, s) => sum + (Math.max(0, parseInt(s.quantity, 10) || 0)),
+            0
+          );
+          await product.update({ stock_quantity: sizeTotal });
           
           await Promise.all(stockPromises);
           console.log(`INFO [PRODUCTS/UPDATE]: Stock entries updated for ${stockPromises.length} sizes`);

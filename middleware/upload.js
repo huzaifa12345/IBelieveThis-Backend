@@ -37,8 +37,8 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 4 // Maximum 4 files
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: 10 // Allow up to 10 product images at once
   }
 });
 
