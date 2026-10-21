@@ -211,6 +211,7 @@ const getAllProducts = async (req, res) => {
 
     console.log('INFO [PRODUCTS/GET_ALL]: Found', count, 'products');
     const productsWithReviews = await attachReviewStats(products);
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({
       products: productsWithReviews,
       pagination: {
@@ -280,6 +281,7 @@ const getProductById = async (req, res) => {
       return res.status(404).json({ error: 'Product not found' });
     }
 
+    res.set('Cache-Control', 'public, max-age=300');
     res.json(product);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -369,6 +371,7 @@ const getProductsByCategory = async (req, res) => {
     console.log(`[DEBUG] Products:`, products.map(p => ({ id: p.id, name: p.name, category_id: p.category_id })));
 
     const productsWithReviews = await attachReviewStats(products);
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({
       products: productsWithReviews,
       pagination: {

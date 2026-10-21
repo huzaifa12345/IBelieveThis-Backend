@@ -7,6 +7,10 @@ import {
   BRAND_DEFAULT_SETTINGS,
   ensureBrandSettings,
 } from '../services/websiteBrandSettingsService.js';
+import {
+  getCachedWebsiteSettingsGrouped,
+  invalidateWebsiteSettingsCache,
+} from '../services/websiteSettingsCache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,6 +45,7 @@ export const updateWebsiteSetting = async (req, res) => {
 
     console.log('Updating setting with value:', finalValue);
     await setting.update({ value: finalValue });
+    invalidateWebsiteSettingsCache();
 
     res.json({
       success: true,
@@ -127,31 +132,11 @@ export const updateWebsiteSetting = async (req, res) => {
 //   }
 // };
 
-// Get all website settings
+// Get all website settings (in-memory cache 5 min; invalidated on admin save)
 export const getWebsiteSettings = async (req, res) => {
   try {
-    // Fresh production DBs may only have shipping — backfill logo/hero if missing
-    const brandCount = await WebsiteSetting.count({
-      where: { category: ['logo', 'hero'], is_active: true },
-    });
-    if (brandCount === 0) {
-      await ensureBrandSettings();
-    }
-
-    const settings = await WebsiteSetting.findAll({
-      where: { is_active: true },
-      order: [['category', 'ASC'], ['sort_order', 'ASC']]
-    });
-
-    // Group settings by category
-    const groupedSettings = {};
-    settings.forEach(setting => {
-      if (!groupedSettings[setting.category]) {
-        groupedSettings[setting.category] = [];
-      }
-      groupedSettings[setting.category].push(setting);
-    });
-
+    const groupedSettings = await getCachedWebsiteSettingsGrouped();
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({
       success: true,
       data: groupedSettings
@@ -198,6 +183,7 @@ export const getSettingByKey = async (req, res) => {
 export const initializeSettings = async (req, res) => {
   try {
     await ensureBrandSettings();
+    invalidateWebsiteSettingsCache();
 
     res.json({
       success: true,
