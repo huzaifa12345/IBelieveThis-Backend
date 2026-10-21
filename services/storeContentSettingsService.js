@@ -27,12 +27,12 @@ export const STORE_CONTENT_DEFAULTS = [
     sort_order: 2,
   },
 
-  // Long-form policies (owner should customize placeholders)
+  // Long-form policies
   {
     key: 'policy_privacy',
     value: `PRIVACY POLICY — IBelieveThis
 
-Last updated: [OWNER: add date]
+Last updated: June 18, 2026
 
 This Privacy Policy explains how IBelieveThis ("we", "us") collects and uses information when you shop at https://www.ibelievethis.us.
 
@@ -56,12 +56,10 @@ We use essential cookies for cart/session and may use analytics cookies to under
 We do not sell your personal information.
 
 6. CCPA / US privacy requests
-If you are a US resident you may request access to or deletion of personal information we hold about you. Email us using the support address on our Contact page. [OWNER: add your privacy contact process]
+If you are a US resident you may request access to or deletion of personal information we hold about you. Email us using the support address on our Contact page, and we will respond within a reasonable time as required by applicable law.
 
 7. Contact
-Use the Contact page or the support email listed in store settings.
-
-[OWNER: Add your legal business name and state of formation when ready.]`,
+Use the Contact page or the support email listed in store settings.`,
     type: 'text',
     description: 'Privacy Policy page body',
     category: 'policies',
@@ -71,7 +69,7 @@ Use the Contact page or the support email listed in store settings.
     key: 'policy_terms',
     value: `TERMS OF SERVICE — IBelieveThis
 
-Last updated: [OWNER: add date]
+Last updated: June 18, 2026
 
 By using https://www.ibelievethis.us you agree to these Terms.
 
@@ -91,7 +89,7 @@ Site content, branding, and product imagery belong to IBelieveThis or its licens
 To the fullest extent allowed by US law, we are not liable for indirect or consequential damages arising from use of the site.
 
 6. Governing law
-[OWNER: Add governing state/law, e.g. "These terms are governed by the laws of the State of ____, USA."]
+These terms are governed by the laws of the United States of America.
 
 7. Contact
 Questions? Use our Contact page.`,
@@ -104,16 +102,16 @@ Questions? Use our Contact page.`,
     key: 'policy_shipping',
     value: `SHIPPING POLICY — IBelieveThis
 
-Last updated: [OWNER: add date]
+Last updated: July 12, 2026
 
 1. Processing time
-Orders are typically processed within [OWNER: e.g. 1–3] business days after payment confirmation (excluding weekends/holidays).
+Orders are typically processed within 1–3 business days after payment confirmation (excluding weekends/holidays).
 
 2. Delivery time
-Transit time after shipment is usually [OWNER: e.g. 3–7] business days within the contiguous United States, depending on carrier and destination. Alaska/Hawaii/PO Boxes may take longer.
+Transit time after shipment is usually 3–7 business days within the contiguous United States, depending on carrier and destination. Alaska/Hawaii/PO Boxes may take longer.
 
 3. Carriers
-We ship via [OWNER: list carriers, e.g. USPS, UPS, FedEx].
+We ship via USPS, UPS, and FedEx.
 
 4. Tracking
 When your order ships you will receive tracking by email when available.
@@ -122,10 +120,10 @@ When your order ships you will receive tracking by email when available.
 Rates (or free-shipping thresholds) are shown at checkout and managed in our shipping settings.
 
 6. Lost or damaged packages
-If a package is lost or arrives damaged, contact us within [OWNER: e.g. 7] days of delivery (or expected delivery) via the Contact page with your order number and photos if damaged. We will work with the carrier to resolve the issue.
+If a package is lost or arrives damaged, contact us within 7 days of delivery (or expected delivery) via the Contact page with your order number and photos if damaged. We will work with the carrier to resolve the issue.
 
 7. International
-[OWNER: State whether you ship only within the US or also internationally.]`,
+We currently ship within the United States.`,
     type: 'text',
     description: 'Shipping Policy page body',
     category: 'policies',
@@ -143,10 +141,25 @@ If a package is lost or arrives damaged, contact us within [OWNER: e.g. 7] days 
 
 export async function ensureStoreContentSettings() {
   for (const setting of STORE_CONTENT_DEFAULTS) {
-    await WebsiteSetting.findOrCreate({
+    const [row, created] = await WebsiteSetting.findOrCreate({
       where: { key: setting.key },
       defaults: { ...setting, is_active: true },
     });
+    // Replace leftover [OWNER…] draft placeholders with finalized defaults
+    if (
+      !created &&
+      typeof row.value === 'string' &&
+      row.value.includes('[OWNER') &&
+      setting.value
+    ) {
+      await row.update({
+        value: setting.value,
+        description: setting.description,
+        type: setting.type,
+        category: setting.category,
+        sort_order: setting.sort_order,
+      });
+    }
   }
 }
 
