@@ -1,5 +1,23 @@
 import { Category, Product } from '../models/index.js';
 import { Op } from 'sequelize';
+import { slugify } from '../utils/slugify.js';
+
+/** Resolve category by numeric id or public name-slug (matches sitemap). */
+async function findCategoryByParam(param) {
+  const raw = decodeURIComponent(String(param || '')).trim();
+  if (!raw) return null;
+
+  if (/^\d+$/.test(raw)) {
+    return Category.findOne({ where: { id: Number(raw), is_active: true } });
+  }
+
+  const categories = await Category.findAll({ where: { is_active: true } });
+  return (
+    categories.find((c) => c.slug && c.slug === raw) ||
+    categories.find((c) => slugify(c.name) === raw) ||
+    null
+  );
+}
 
 // Get all categories (simplified)
 const getAllCategories = async (req, res) => {
@@ -47,32 +65,39 @@ const getAllCategories = async (req, res) => {
   }
 };
 
-// Get category by ID
+// Get category by ID or SEO slug
 const getCategoryById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    const category = await Category.findOne({
-      where: { id, is_active: true }
-    });
+    const category = await findCategoryByParam(id);
 
     if (!category) {
-      return res.status(404).json({ 
-        success: false, 
-        error: 'Category not found' 
+      return res.status(404).json({
+        success: false,
+        error: 'Category not found',
       });
     }
 
-    res.json({
-      success: true,
-      data: category
-    });
+    // Return plain category object (storefront expects this shape)
+    res.json(category);
   } catch (error) {
     console.error('ERROR AT [CATEGORIES/GET_BY_ID]:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to fetch category'
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch category',
     });
+  }
+};
+
+const getCategoryBySlug = async (req, res) => {
+  try {
+    const category = await findCategoryByParam(req.params.slug);
+    if (!category) {
+      return res.status(404).json({ success: false, error: 'Category not found' });
+    }
+    res.json(category);
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to fetch category' });
   }
 };
 
@@ -270,6 +295,7 @@ const getCategoryTree = async (req, res) => {
 export {
   getAllCategories,
   getCategoryById,
+  getCategoryBySlug,
   createCategory,
   updateCategory,
   deleteCategory,

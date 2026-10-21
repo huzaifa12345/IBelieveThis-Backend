@@ -1,6 +1,7 @@
 import { Product, Category, Size, Stock } from '../models/index.js';
 import { Op } from 'sequelize';
 import { refreshSitemapAsync } from '../services/sitemapService.js';
+import { triggerFrontendRebuildAsync } from '../services/deployHookService.js';
 
 const getSortConfig = (sortByRaw = 'created_at', orderRaw = 'DESC') => {
   const sortBy = String(sortByRaw).toLowerCase();
@@ -237,24 +238,30 @@ const getProductsByCategory = async (req, res) => {
     
     const offset = (page - 1) * limit;
 
-    // Try to parse category as ID first, if it fails, search by category name
-    const categoryId = parseInt(category);
-    const isNumeric = !isNaN(categoryId);
-
-    console.log(`[DEBUG] Parsed categoryId: ${categoryId}, isNumeric: ${isNumeric}`);
+    const rawCat = decodeURIComponent(String(category || '')).trim();
+    const categoryId = parseInt(rawCat, 10);
+    const isNumeric = !isNaN(categoryId) && String(categoryId) === rawCat;
 
     const whereCondition = {
       is_active: true
     };
 
     if (isNumeric) {
-      // If category is a number, filter by category_id
       whereCondition.category_id = categoryId;
-      console.log(`[DEBUG] Filtering by category_id: ${categoryId}`);
     } else {
-      // Otherwise, filter by category name
-      whereCondition.category = category;
-      console.log(`[DEBUG] Filtering by category name: ${category}`);
+      // Resolve SEO slug → category id (matches sitemap /category/:slug)
+      const { slugify } = await import('../utils/slugify.js');
+      const cats = await Category.findAll({ where: { is_active: true } });
+      const matched =
+        cats.find((c) => c.slug === rawCat) ||
+        cats.find((c) => slugify(c.name) === rawCat) ||
+        cats.find((c) => c.name?.toLowerCase() === rawCat.toLowerCase());
+
+      if (matched) {
+        whereCondition.category_id = matched.id;
+      } else {
+        whereCondition.category = rawCat;
+      }
     }
 
     if (search) {
@@ -629,6 +636,7 @@ const createProduct = async (req, res) => {
     console.log('INFO [PRODUCTS/CREATE]: Product created successfully with ID:', product.id);
 
     refreshSitemapAsync();
+    triggerFrontendRebuildAsync('product-change');
     res.status(201).json(createdProduct);
   } catch (error) {
     console.error('ERROR AT [PRODUCTS/CREATE]:', error);
@@ -770,6 +778,7 @@ const updateProduct = async (req, res) => {
     });
 
     refreshSitemapAsync();
+    triggerFrontendRebuildAsync('product-change');
     res.json(updatedProduct);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -790,6 +799,7 @@ const deleteProduct = async (req, res) => {
     await product.destroy();
 
     refreshSitemapAsync();
+    triggerFrontendRebuildAsync('product-change');
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     res.status(400).json({ error: error.message });

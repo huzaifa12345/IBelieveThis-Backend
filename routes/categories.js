@@ -2,6 +2,7 @@ import express from 'express';
 import {
   getAllCategories,
   getCategoryById,
+  getCategoryBySlug,
   createCategory,
   updateCategory,
   deleteCategory,
@@ -16,6 +17,7 @@ const router = express.Router();
 router.get('/', getAllCategories);
 router.get('/root', getRootCategories);
 router.get('/tree', getCategoryTree);
+router.get('/slug/:slug', getCategoryBySlug);
 router.get('/:id', getCategoryById);
 
 // Admin routes

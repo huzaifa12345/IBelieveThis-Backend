@@ -66,6 +66,15 @@ app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), han
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// HSTS — browsers should only use HTTPS (enable after HTTPS works on apex + www)
+app.use((req, res, next) => {
+  res.setHeader(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains; preload'
+  );
+  next();
+});
+
  
 app.use('/uploads', express.static('uploads'));
 
@@ -88,8 +97,8 @@ app.get('/sitemap.xml', getSitemap);
 app.get('/api/sitemap.xml', getSitemap);
 app.post('/api/sitemap/rebuild', authenticateToken, requireAdmin, rebuildSitemap);
 
-// Health check endpoint (Deployment verify karne ke liye best hai)
-app.get('/api/health', (req, res) => {
+// Lightweight warm / uptime ping (also at /health for cron convenience)
+const healthHandler = (req, res) => {
   const resendFrom = process.env.RESEND_FROM || '';
   const resendKey = process.env.RESEND_API_KEY || '';
   const ownerRaw = (process.env.ORDER_NOTIFICATION_EMAIL || process.env.GMAIL_USER || '').trim();
@@ -110,7 +119,9 @@ app.get('/api/health', (req, res) => {
       owner_email_hint: ownerHint,
     },
   });
-});
+};
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
