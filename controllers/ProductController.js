@@ -1,7 +1,59 @@
-import { Product, Category, Size, Stock } from '../models/index.js';
+import { Product, Category, Size, Stock, Review, sequelize } from '../models/index.js';
 import { Op } from 'sequelize';
 import { refreshSitemapAsync } from '../services/sitemapService.js';
 import { triggerFrontendRebuildAsync } from '../services/deployHookService.js';
+
+/** Attach averageRating / reviewCount for approved reviews only (never invent ratings). */
+async function attachReviewStats(products) {
+  const rows = Array.isArray(products) ? products : [];
+  if (!rows.length) return rows;
+  const ids = rows.map((p) => p.id).filter(Boolean);
+  const stats = await Review.findAll({
+    where: { product_id: { [Op.in]: ids }, status: 'approved' },
+    attributes: [
+      'product_id',
+      [sequelize.fn('AVG', sequelize.col('rating')), 'averageRating'],
+      [sequelize.fn('COUNT', sequelize.col('id')), 'reviewCount'],
+    ],
+    group: ['product_id'],
+    raw: true,
+  });
+  const map = Object.fromEntries(
+    stats.map((s) => [
+      s.product_id,
+      {
+        averageRating: Number(parseFloat(s.averageRating || 0).toFixed(1)),
+        reviewCount: parseInt(s.reviewCount || 0, 10),
+      },
+    ])
+  );
+  return rows.map((p) => {
+    const plain = typeof p.toJSON === 'function' ? p.toJSON() : { ...p };
+    const s = map[plain.id];
+    if (s && s.reviewCount > 0) {
+      plain.averageRating = s.averageRating;
+      plain.reviewCount = s.reviewCount;
+    }
+    return plain;
+  });
+}
+
+/** Effective storefront price: discount when set and lower than unit price */
+const effectivePriceSql = `COALESCE(NULLIF("Product"."discount_price", 0), "Product"."price")`;
+
+const applyEffectivePriceFilter = (where, minPrice, maxPrice) => {
+  if (minPrice == null && maxPrice == null) return where;
+  const parts = [];
+  if (minPrice != null && minPrice !== '') {
+    parts.push(sequelize.where(sequelize.literal(effectivePriceSql), { [Op.gte]: Number(minPrice) }));
+  }
+  if (maxPrice != null && maxPrice !== '') {
+    parts.push(sequelize.where(sequelize.literal(effectivePriceSql), { [Op.lte]: Number(maxPrice) }));
+  }
+  if (!parts.length) return where;
+  where[Op.and] = [...(where[Op.and] || []), ...parts];
+  return where;
+};
 
 const getSortConfig = (sortByRaw = 'created_at', orderRaw = 'DESC') => {
   const sortBy = String(sortByRaw).toLowerCase();
@@ -11,15 +63,22 @@ const getSortConfig = (sortByRaw = 'created_at', orderRaw = 'DESC') => {
     created_at: ['created_at', order],
     newest: ['created_at', 'DESC'],
     oldest: ['created_at', 'ASC'],
-    price_low: ['price', 'ASC'],
-    price_high: ['price', 'DESC'],
+    price_low: ['__effective_price__', 'ASC'],
+    price_high: ['__effective_price__', 'DESC'],
     name_asc: ['name', 'ASC'],
     name_desc: ['name', 'DESC'],
-    price: ['price', order],
+    price: ['__effective_price__', order],
     name: ['name', order],
   };
 
   return map[sortBy] || ['created_at', 'DESC'];
+};
+
+const toOrderClause = (sortField, sortOrder) => {
+  if (sortField === '__effective_price__') {
+    return [[sequelize.literal(effectivePriceSql), sortOrder]];
+  }
+  return [[sortField, sortOrder]];
 };
 
 // Generate next SKU
@@ -106,21 +165,32 @@ const getAllProducts = async (req, res) => {
       where.category = category;
     }
     
-    // Search functionality
+    // Search: name/category ranking (no description match — avoids "bel" → patch noise)
+    let orderClause = toOrderClause(sortField, sortOrder);
     if (search) {
+      const q = String(search).trim();
       where[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
-        { brand: { [Op.iLike]: `%${search}%` } }
+        { name: { [Op.iLike]: `%${q}%` } },
+        { category: { [Op.iLike]: `%${q}%` } },
+        { '$category_relation.name$': { [Op.iLike]: `%${q}%` } },
+        { brand: { [Op.iLike]: `%${q}%` } },
+      ];
+      const safe = q.replace(/'/g, "''");
+      orderClause = [
+        [
+          sequelize.literal(`CASE
+            WHEN "Product"."name" ILIKE '${safe}%' THEN 0
+            WHEN "Product"."name" ILIKE '%${safe}%' THEN 1
+            WHEN "Product"."category" ILIKE '%${safe}%' THEN 2
+            WHEN "category_relation"."name" ILIKE '%${safe}%' THEN 2
+            ELSE 3 END`),
+          'ASC',
+        ],
+        ...toOrderClause(sortField, sortOrder),
       ];
     }
-    
-    // Price range filter
-    if (minPrice || maxPrice) {
-      where.price = {};
-      if (minPrice) where.price[Op.gte] = minPrice;
-      if (maxPrice) where.price[Op.lte] = maxPrice;
-    }
+
+    applyEffectivePriceFilter(where, minPrice, maxPrice);
 
     const offset = (page - 1) * limit;
 
@@ -130,16 +200,19 @@ const getAllProducts = async (req, res) => {
       include: [{
         model: Category,
         as: 'category_relation',
-        attributes: ['id', 'name']
+        attributes: ['id', 'name'],
+        required: false,
       }],
       limit: parseInt(limit),
       offset,
-      order: [[sortField, sortOrder]],
+      order: orderClause,
+      subQuery: false,
     });
 
     console.log('INFO [PRODUCTS/GET_ALL]: Found', count, 'products');
+    const productsWithReviews = await attachReviewStats(products);
     res.json({
-      products,
+      products: productsWithReviews,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -265,18 +338,16 @@ const getProductsByCategory = async (req, res) => {
     }
 
     if (search) {
+      const q = String(search).trim();
       whereCondition[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
-        { brand: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.iLike]: `%${q}%` } },
+        { category: { [Op.iLike]: `%${q}%` } },
+        { '$category_relation.name$': { [Op.iLike]: `%${q}%` } },
+        { brand: { [Op.iLike]: `%${q}%` } },
       ];
     }
 
-    if (minPrice || maxPrice) {
-      whereCondition.price = {};
-      if (minPrice) whereCondition.price[Op.gte] = minPrice;
-      if (maxPrice) whereCondition.price[Op.lte] = maxPrice;
-    }
+    applyEffectivePriceFilter(whereCondition, minPrice, maxPrice);
 
     console.log(`[DEBUG] whereCondition:`, whereCondition);
 
@@ -285,18 +356,21 @@ const getProductsByCategory = async (req, res) => {
       include: [{
         model: Category,
         as: 'category_relation',
-        attributes: ['id', 'name']
+        attributes: ['id', 'name'],
+        required: false,
       }],
       limit: parseInt(limit),
       offset,
-      order: [[sortField, sortOrder]]
+      order: toOrderClause(sortField, sortOrder),
+      subQuery: false,
     });
 
     console.log(`[DEBUG] Found ${count} products`);
     console.log(`[DEBUG] Products:`, products.map(p => ({ id: p.id, name: p.name, category_id: p.category_id })));
 
+    const productsWithReviews = await attachReviewStats(products);
     res.json({
-      products,
+      products: productsWithReviews,
       pagination: {
         total: count,
         page: parseInt(page),
@@ -817,28 +891,43 @@ const searchProducts = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
+    const term = String(q).trim();
+    const safe = term.replace(/'/g, "''");
     const { count, rows: products } = await Product.findAndCountAll({
       where: {
         [Op.and]: [
           { is_active: true },
           {
             [Op.or]: [
-              { name: { [Op.iLike]: `%${q}%` } },
-              { description: { [Op.iLike]: `%${q}%` } },
-              { brand: { [Op.iLike]: `%${q}%` } },
-              { category: { [Op.iLike]: `%${q}%` } }
-            ]
-          }
-        ]
+              { name: { [Op.iLike]: `%${term}%` } },
+              { category: { [Op.iLike]: `%${term}%` } },
+              { '$category_relation.name$': { [Op.iLike]: `%${term}%` } },
+              { brand: { [Op.iLike]: `%${term}%` } },
+            ],
+          },
+        ],
       },
       include: [{
         model: Category,
         as: 'category_relation',
-        attributes: ['id', 'name']
+        attributes: ['id', 'name'],
+        required: false,
       }],
       limit: parseInt(limit),
       offset,
-      order: [['created_at', 'DESC']]
+      subQuery: false,
+      order: [
+        [
+          sequelize.literal(`CASE
+            WHEN "Product"."name" ILIKE '${safe}%' THEN 0
+            WHEN "Product"."name" ILIKE '%${safe}%' THEN 1
+            WHEN "Product"."category" ILIKE '%${safe}%' THEN 2
+            WHEN "category_relation"."name" ILIKE '%${safe}%' THEN 2
+            ELSE 3 END`),
+          'ASC',
+        ],
+        ['created_at', 'DESC'],
+      ],
     });
 
     res.json({

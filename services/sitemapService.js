@@ -62,6 +62,9 @@ export async function buildSitemapXml() {
     urlEntry(`${SITE}/about`, { priority: '0.6', changefreq: 'monthly' }),
     urlEntry(`${SITE}/return-policy`, { priority: '0.5', changefreq: 'monthly' }),
     urlEntry(`${SITE}/contact`, { priority: '0.5', changefreq: 'monthly' }),
+    urlEntry(`${SITE}/privacy-policy`, { priority: '0.4', changefreq: 'yearly' }),
+    urlEntry(`${SITE}/terms-of-service`, { priority: '0.4', changefreq: 'yearly' }),
+    urlEntry(`${SITE}/shipping-policy`, { priority: '0.5', changefreq: 'monthly' }),
   ];
 
   const categoryPages = categories.map((cat) =>
