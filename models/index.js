@@ -10,6 +10,7 @@ import Stock from "./Stock.js";
 import WebsiteSetting from "./WebsiteSetting.js";
 import FailedEmail from "./FailedEmail.js";
 import PaymentAudit from "./PaymentAudit.js";
+import ContactMessage from "./ContactMessage.js";
 
 // Initialize Review model
 const Review = initReview(sequelize);
@@ -69,5 +70,6 @@ export {
   Stock,
   WebsiteSetting,
   FailedEmailModel,
-  PaymentAudit
+  PaymentAudit,
+  ContactMessage,
 };

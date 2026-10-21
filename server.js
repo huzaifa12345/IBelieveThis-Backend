@@ -21,6 +21,8 @@ import shippingRoutes from './routes/shipping.js';
 import { handleStripeWebhook } from './controllers/PaymentController.js';
 import { ensureShippingSettings } from './services/shippingSettingsService.js';
 import { ensureBrandSettings } from './services/websiteBrandSettingsService.js';
+import { ensureStoreContentSettings } from './services/storeContentSettingsService.js';
+import contactRoutes from './routes/contact.js';
 import { ensureFailedEmailTimestamps } from './scripts/fixFailedEmailTimestamps.js';
 import { getSitemap, rebuildSitemap } from './controllers/SitemapController.js';
 import { authenticateToken, requireAdmin } from './middleware/auth.js';
@@ -91,6 +93,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/website-settings', websiteSetting);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/shipping', shippingRoutes);
+app.use('/api/contact', contactRoutes);
 
 // Live SEO sitemap (DB-driven — new products appear automatically)
 app.get('/sitemap.xml', getSitemap);
@@ -150,6 +153,7 @@ const startServer = async () => {
     await ensureShippingSettings();
     console.log('Shipping settings ready.');
     await ensureBrandSettings();
+    await ensureStoreContentSettings();
     console.log('Logo & hero slider settings ready.');
 
     // Warm sitemap file on boot so Frontend/public stays in sync for local/static hosts
