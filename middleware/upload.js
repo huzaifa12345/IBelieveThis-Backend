@@ -15,11 +15,11 @@ const storage = new CloudinaryStorage({
   params: {
     folder: 'ecommerce_products',
     allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'gif'],
+    transformation: [{ width: 1600, crop: 'limit', quality: 'auto:good', fetch_format: 'auto' }],
     public_id: (req, file) => {
-      // Create unique filename
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       return `product-${file.fieldname}-${uniqueSuffix}`;
-    }
+    },
   },
 });
 
@@ -37,9 +37,9 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB per file
-    files: 10 // Allow up to 10 product images at once
-  }
+    fileSize: 10 * 1024 * 1024, // 10MB per file (compressed on upload)
+    files: 10,
+  },
 });
 
 export default upload;

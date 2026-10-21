@@ -102,7 +102,7 @@ router.post('/payment-screenshot', paymentUpload.single('image'), (req, res) => 
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'File size too large. Maximum size is 5MB.' });
+      return res.status(400).json({ error: 'File size too large. Maximum size is 10MB per image.' });
     }
     if (error.code === 'LIMIT_FILE_COUNT') {
       return res.status(400).json({ error: 'Too many files. Maximum is 10 files.' });

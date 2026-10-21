@@ -1,11 +1,13 @@
 import express from 'express';
 import {
   createReview,
+  adminCreateReview,
   getProductReviews,
   getAllReviews,
   updateReviewStatus,
   deleteReview
 } from '../controllers/reviewController.js';
+import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -13,9 +15,10 @@ const router = express.Router();
 router.post('/', createReview);
 router.get('/product/:productId', getProductReviews);
 
-// Admin routes (add authentication middleware later)
-router.get('/admin/all', getAllReviews);
-router.put('/admin/:id/status', updateReviewStatus);
-router.delete('/admin/:id', deleteReview);
+// Admin routes
+router.get('/admin/all', authenticateToken, requireAdmin, getAllReviews);
+router.post('/admin', authenticateToken, requireAdmin, adminCreateReview);
+router.put('/admin/:id/status', authenticateToken, requireAdmin, updateReviewStatus);
+router.delete('/admin/:id', authenticateToken, requireAdmin, deleteReview);
 
 export default router;

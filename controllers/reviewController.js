@@ -50,6 +50,53 @@ export const createReview = async (req, res) => {
   }
 };
 
+/** Admin: add/import a real review (e.g. from Etsy) with optional verified flag and date */
+export const adminCreateReview = async (req, res) => {
+  try {
+    const {
+      product_id,
+      customer_name,
+      rating,
+      comment,
+      email,
+      is_verified = true,
+      review_date,
+      status = 'approved',
+    } = req.body;
+
+    if (!product_id || !customer_name || !rating || !comment) {
+      return res.status(400).json({
+        error: 'Missing required fields: product_id, customer_name, rating, comment',
+      });
+    }
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    }
+
+    const product = await Product.findByPk(product_id);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const review = await Review.create({
+      product_id,
+      customer_name: String(customer_name).trim(),
+      rating: Number(rating),
+      comment: String(comment).trim(),
+      email: email || null,
+      is_verified: Boolean(is_verified),
+      is_approved: status === 'approved',
+      status,
+      created_at: review_date ? new Date(review_date) : undefined,
+    });
+
+    res.status(201).json({ message: 'Review added', review });
+  } catch (error) {
+    console.error('Error admin-creating review:', error);
+    res.status(500).json({ error: 'Failed to create review', details: error.message });
+  }
+};
+
 // Get all reviews for a product
 export const getProductReviews = async (req, res) => {
   try {
