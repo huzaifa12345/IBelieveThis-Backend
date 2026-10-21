@@ -136,7 +136,8 @@ export const updateWebsiteSetting = async (req, res) => {
 export const getWebsiteSettings = async (req, res) => {
   try {
     const groupedSettings = await getCachedWebsiteSettingsGrouped();
-    res.set('Cache-Control', 'public, max-age=300');
+    // Short cache — contact_email / policies change from admin and must appear on store quickly
+    res.set('Cache-Control', 'public, max-age=60, must-revalidate');
     res.json({
       success: true,
       data: groupedSettings
