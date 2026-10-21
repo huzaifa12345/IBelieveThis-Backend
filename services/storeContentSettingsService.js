@@ -8,6 +8,15 @@ export const STORE_CONTENT_DEFAULTS = [
   { key: 'contact_address', value: '', type: 'text', description: 'Business address (optional — leave blank until ready)', category: 'contact', sort_order: 3 },
   { key: 'business_hours', value: 'Mon–Fri, 9am–5pm US Eastern', type: 'text', description: 'Business hours', category: 'contact', sort_order: 4 },
   { key: 'reply_time', value: 'We typically reply within 1–2 business days.', type: 'text', description: 'Expected reply time', category: 'contact', sort_order: 5 },
+  { key: 'service_area', value: 'United States', type: 'text', description: 'Primary service area (shown on About/Contact)', category: 'contact', sort_order: 6 },
+  {
+    key: 'etsy_selling_history',
+    value: '',
+    type: 'text',
+    description: 'Optional Etsy selling history blurb (e.g. “Selling on Etsy since 2019”). Leave blank if unused — never invent stats.',
+    category: 'contact',
+    sort_order: 7,
+  },
 
   // Social (empty = hidden in footer)
   { key: 'social_pinterest', value: '', type: 'url', description: 'Pinterest profile URL', category: 'social', sort_order: 1 },

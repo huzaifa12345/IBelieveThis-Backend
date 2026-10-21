@@ -56,12 +56,24 @@ export async function buildSitemapXml() {
     Category.findAll({ where: { is_active: true }, order: [['id', 'ASC']] }),
   ]);
 
+  const guideSlugs = [
+    'what-is-a-motorcycle-guardian-bell',
+    'how-to-hang-a-guardian-bell',
+    'how-to-choose-biker-boots',
+  ];
+
   const staticPages = [
     urlEntry(`${SITE}/`, { priority: '1.0', changefreq: 'daily' }),
     urlEntry(`${SITE}/all-products`, { priority: '0.9', changefreq: 'daily' }),
     urlEntry(`${SITE}/about`, { priority: '0.6', changefreq: 'monthly' }),
-    urlEntry(`${SITE}/return-policy`, { priority: '0.5', changefreq: 'monthly' }),
     urlEntry(`${SITE}/contact`, { priority: '0.5', changefreq: 'monthly' }),
+    urlEntry(`${SITE}/faq`, { priority: '0.7', changefreq: 'monthly' }),
+    urlEntry(`${SITE}/size-guide`, { priority: '0.7', changefreq: 'monthly' }),
+    urlEntry(`${SITE}/guides`, { priority: '0.7', changefreq: 'monthly' }),
+    ...guideSlugs.map((slug) =>
+      urlEntry(`${SITE}/guides/${slug}`, { priority: '0.6', changefreq: 'monthly' })
+    ),
+    urlEntry(`${SITE}/return-policy`, { priority: '0.5', changefreq: 'monthly' }),
     urlEntry(`${SITE}/privacy-policy`, { priority: '0.4', changefreq: 'yearly' }),
     urlEntry(`${SITE}/terms-of-service`, { priority: '0.4', changefreq: 'yearly' }),
     urlEntry(`${SITE}/shipping-policy`, { priority: '0.5', changefreq: 'monthly' }),

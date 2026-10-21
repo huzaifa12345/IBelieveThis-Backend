@@ -30,12 +30,36 @@ import { refreshSitemapAsync } from './services/sitemapService.js';
 
 const app = express();
 
-const PORT = process.env.PORT || 10004; 
+const PORT = process.env.PORT || 10004;
+const CANONICAL_HOST = 'www.ibelievethis.us';
 
 // Request logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`);
   next();
+});
+
+/**
+ * Force HTTPS + www for public storefront hosts.
+ * Relies on x-forwarded-proto from Render/proxies. If HTTP to apex/www times out
+ * before reaching this app, also enable HTTPS redirects on the DNS/CDN/custom-domain
+ * provider (Render → Custom Domains → redirect HTTP→HTTPS; apex→www).
+ */
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0].toLowerCase();
+  if (host !== 'ibelievethis.us' && host !== 'www.ibelievethis.us') {
+    return next();
+  }
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const needsHttps = proto === 'http';
+  const needsWww = host === 'ibelievethis.us';
+  if (needsHttps || needsWww) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl || '/'}`);
+  }
+  return next();
 });
 
 // Middleware
